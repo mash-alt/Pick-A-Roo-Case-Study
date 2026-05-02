@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../api/axios';
-import { BarChart3, ClipboardList, LayoutDashboard, PackagePlus, ShoppingBag, Plus, X, Edit, Trash2, Truck, CheckCircle2 } from 'lucide-react';
+import { BarChart3, ClipboardList, LayoutDashboard, PackagePlus, ShoppingBag, Plus, X, Edit, Trash2, Truck, CheckCircle2, AlertCircle } from 'lucide-react';
 import { mapOrder } from '../api/mappers';
+import { toast } from 'sonner';
 
 interface Product {
   Prod_ID: number;
@@ -58,14 +59,67 @@ export default function Dashboard() {
   const pending = orders.filter((order) => order.Order_Status === 'PENDING').length;
   const completed = orders.filter((order) => order.Order_Status === 'COMPLETED').length;
 
-  const handleUpdateStatus = async (orderId: number, newStatus: string) => {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'PENDING':
+        return 'bg-gray-50 text-gray-700 ring-gray-200';
+      case 'CONFIRMED':
+        return 'bg-blue-50 text-blue-700 ring-blue-200';
+      case 'IN_PROGRESS':
+        return 'bg-amber-50 text-amber-700 ring-amber-200';
+      case 'COMPLETED':
+        return 'bg-green-50 text-green-700 ring-green-200';
+      case 'CANCELLED':
+        return 'bg-red-50 text-red-700 ring-red-200';
+      default:
+        return 'bg-gray-50 text-gray-700 ring-gray-200';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    return status.replace(/_/g, ' ').split(' ').map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
+  };
+    const oldOrder = orders.find(o => o.Order_ID === orderId);
+    if (!oldOrder) return;
+
+    // Optimistically update the UI
     setUpdating(orderId);
+    setOrders(orders.map(o =>
+      o.Order_ID === orderId ? { ...o, Order_Status: newStatus as any } : o
+    ));
+
     try {
       const res = await api.put(`/orders/${orderId}`, { Order_Status: newStatus });
-      setOrders(orders.map(o => o.Order_ID === orderId ? res.data : o));
+      const updatedOrder = res.data?.data || res.data;
+
+      // Update with server response
+      setOrders(orders.map(o =>
+        o.Order_ID === orderId ? { ...updatedOrder } : o
+      ));
+
+      // Show success toast with status transition
+      const statusLabel = {
+        'PENDING': 'Pending',
+        'CONFIRMED': 'Confirmed',
+        'IN_PROGRESS': 'In Progress',
+        'COMPLETED': 'Delivered',
+        'CANCELLED': 'Cancelled'
+      }[newStatus] || newStatus;
+
+      toast.success(`Order #${orderId} updated to ${statusLabel}`, {
+        description: new Date().toLocaleTimeString(),
+      });
     } catch (err: any) {
+      // Revert on error
+      setOrders(orders.map(o =>
+        o.Order_ID === orderId ? oldOrder : o
+      ));
+
+      const errorMsg = err.response?.data?.message || 'Failed to update order status';
       console.error('Failed to update order status:', err);
-      alert(err.response?.data?.message || 'Failed to update order status');
+      toast.error('Update Failed', {
+        description: errorMsg,
+      });
     } finally {
       setUpdating(null);
     }
@@ -288,14 +342,14 @@ export default function Dashboard() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {orders.map((order) => (
-                      <tr key={order.Order_ID} className="bg-white">
+                      <tr key={order.Order_ID} className={`bg-white transition-all duration-300 ${updating === order.Order_ID ? 'bg-orange-50 scale-[1.01]' : ''}`}>
                         <td className="px-5 py-4 font-extrabold text-[#333333]">#{order.Order_ID}</td>
                         <td className="px-5 py-4 font-medium text-[#777777]">
                           {new Date(order.Order_OrderDate).toLocaleDateString()}
                         </td>
                         <td className="px-5 py-4 font-extrabold text-[#333333]">${order.Order_Total?.toFixed(2) || '0.00'}</td>
                         <td className="px-5 py-4">
-                          <span className={`rounded-full px-3 py-1 text-xs font-extrabold uppercase ${
+                          <span className={`rounded-full px-3 py-1 text-xs font-extrabold uppercase transition-all ${
                             order.Order_PaymentStatus === 'PAID' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'
                           }`}>
                             {order.Order_PaymentStatus || 'PENDING'}
@@ -306,13 +360,9 @@ export default function Dashboard() {
                             value={order.Order_Status}
                             onChange={(e) => handleUpdateStatus(order.Order_ID, e.target.value)}
                             disabled={updating === order.Order_ID}
-                            className={`rounded-full border-0 px-3 py-2 text-xs font-extrabold uppercase outline-none ring-1 transition-all ${
-                              order.Order_Status === 'COMPLETED'
-                                ? 'bg-green-50 text-green-700 ring-green-200'
-                                : order.Order_Status === 'CANCELLED'
-                                ? 'bg-red-50 text-red-700 ring-red-200'
-                                : 'bg-orange-50 text-orange-700 ring-orange-100 hover:ring-orange-200'
-                            } ${updating === order.Order_ID ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                            className={`rounded-full border-0 px-3 py-2 text-xs font-extrabold uppercase outline-none ring-1 transition-all duration-300 ${
+                              getStatusColor(order.Order_Status)
+                            } ${updating === order.Order_ID ? 'opacity-70 cursor-wait ring-2' : 'cursor-pointer hover:ring-2'}`}
                           >
                             <option value="PENDING">Pending</option>
                             <option value="CONFIRMED">Confirmed</option>
@@ -323,14 +373,19 @@ export default function Dashboard() {
                         </td>
                         <td className="px-5 py-4">
                           {order.Order_Status === 'COMPLETED' ? (
-                            <div className="flex items-center gap-2 text-green-600 font-medium">
+                            <div className="flex items-center gap-2 text-green-600 font-medium animate-pulse">
                               <CheckCircle2 className="h-4 w-4" />
                               Delivered
                             </div>
                           ) : order.Order_Status === 'IN_PROGRESS' ? (
-                            <div className="flex items-center gap-2 text-blue-600 font-medium">
+                            <div className="flex items-center gap-2 text-blue-600 font-medium animate-bounce">
                               <Truck className="h-4 w-4" />
                               In Transit
+                            </div>
+                          ) : order.Order_Status === 'CANCELLED' ? (
+                            <div className="flex items-center gap-2 text-red-600 font-medium">
+                              <AlertCircle className="h-4 w-4" />
+                              Cancelled
                             </div>
                           ) : (
                             <span className="text-[#777777] text-sm">-</span>
