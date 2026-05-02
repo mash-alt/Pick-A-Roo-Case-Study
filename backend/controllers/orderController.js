@@ -2,7 +2,7 @@ const Order = require('../models/orderModel');
 
 async function getOrders(req, res) {
   const orders = await Order.findAllForUser(req.user);
-  res.json(orders);
+  res.json({ data: orders });
 }
 
 async function getOrder(req, res) {

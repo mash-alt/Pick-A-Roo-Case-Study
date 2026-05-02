@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '../api/axios';
-import { BarChart3, ClipboardList, LayoutDashboard, PackagePlus, ShoppingBag, Plus, X, Edit, Trash2 } from 'lucide-react';
+import { BarChart3, ClipboardList, LayoutDashboard, PackagePlus, ShoppingBag, Plus, X, Edit, Trash2, Truck, CheckCircle2 } from 'lucide-react';
 import { mapOrder } from '../api/mappers';
 
 interface Product {
@@ -12,10 +12,23 @@ interface Product {
   Prod_ImageURL: string;
 }
 
+interface Order {
+  Order_ID: number;
+  Order_UserID: number;
+  Order_StoreID: number;
+  Order_ShoprID?: number;
+  Order_OrderDate: string;
+  Order_Total: number;
+  Order_Status: 'PENDING' | 'CONFIRMED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  Order_PaymentStatus: string;
+  Order_DeliveryAddress: string;
+}
+
 export default function Dashboard() {
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'orders'>('overview');
   const [showProductModal, setShowProductModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -28,10 +41,12 @@ export default function Dashboard() {
           api.get('/orders'),
           api.get('/products')
         ]);
-        setOrders(ordersRes.data.data?.map(mapOrder).filter(Boolean) || []);
-        setProducts(productsRes.data.data || []);
+        const ordersData = ordersRes.data?.data || ordersRes.data || [];
+        const productsData = productsRes.data?.data || productsRes.data || [];
+        setOrders(Array.isArray(ordersData) ? ordersData : []);
+        setProducts(Array.isArray(productsData) ? productsData : []);
       } catch (err) {
-        console.error(err);
+        console.error('Failed to fetch dashboard data:', err);
       } finally {
         setLoading(false);
       }
@@ -39,8 +54,22 @@ export default function Dashboard() {
     fetchData();
   }, []);
 
-  const revenue = useMemo(() => orders.reduce((acc, cur) => acc + (cur.total || 0), 0), [orders]);
-  const pending = orders.filter((order) => order.status === 'pending').length;
+  const revenue = useMemo(() => orders.reduce((acc, cur) => acc + (cur.Order_Total || 0), 0), [orders]);
+  const pending = orders.filter((order) => order.Order_Status === 'PENDING').length;
+  const completed = orders.filter((order) => order.Order_Status === 'COMPLETED').length;
+
+  const handleUpdateStatus = async (orderId: number, newStatus: string) => {
+    setUpdating(orderId);
+    try {
+      const res = await api.put(`/orders/${orderId}`, { Order_Status: newStatus });
+      setOrders(orders.map(o => o.Order_ID === orderId ? res.data : o));
+    } catch (err: any) {
+      console.error('Failed to update order status:', err);
+      alert(err.response?.data?.message || 'Failed to update order status');
+    } finally {
+      setUpdating(null);
+    }
+  };
 
   const handleSaveProduct = async () => {
     try {
@@ -144,8 +173,8 @@ export default function Dashboard() {
             <section className="grid gap-4 sm:grid-cols-3">
               {[
                 { label: 'Revenue', value: `$${revenue.toFixed(2)}`, icon: BarChart3 },
-                { label: 'Orders', value: orders.length, icon: ShoppingBag },
-                { label: 'Pending', value: pending, icon: ClipboardList }
+                { label: 'Total Orders', value: orders.length, icon: ShoppingBag },
+                { label: 'Delivered', value: completed, icon: CheckCircle2 }
               ].map((stat) => {
                 const Icon = stat.icon;
                 return (
@@ -237,7 +266,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between border-b border-gray-100 p-5">
               <div>
                 <h2 className="text-xl font-extrabold text-[#333333]">Recent orders</h2>
-                <p className="mt-1 text-sm font-medium text-[#777777]">Update status as orders move.</p>
+                <p className="mt-1 text-sm font-medium text-[#777777]">Update status as orders move through fulfillment.</p>
               </div>
             </div>
             {loading ? (
@@ -246,39 +275,72 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[680px] text-left">
+                <table className="w-full min-w-[800px] text-left">
                   <thead className="bg-gray-50 text-sm font-extrabold text-[#777777]">
                     <tr>
-                      <th className="px-5 py-4">Order</th>
+                      <th className="px-5 py-4">Order ID</th>
                       <th className="px-5 py-4">Date</th>
                       <th className="px-5 py-4">Total</th>
                       <th className="px-5 py-4">Payment</th>
                       <th className="px-5 py-4">Status</th>
+                      <th className="px-5 py-4">Delivery</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {orders.map((order) => (
-                      <tr key={order.id} className="bg-white">
-                        <td className="px-5 py-4 font-extrabold text-[#333333]">#{order.id}</td>
-                        <td className="px-5 py-4 font-medium text-[#777777]">{new Date(order.createdAt).toLocaleDateString()}</td>
-                        <td className="px-5 py-4 font-extrabold text-[#333333]">${(order.total || 0).toFixed(2)}</td>
+                      <tr key={order.Order_ID} className="bg-white">
+                        <td className="px-5 py-4 font-extrabold text-[#333333]">#{order.Order_ID}</td>
+                        <td className="px-5 py-4 font-medium text-[#777777]">
+                          {new Date(order.Order_OrderDate).toLocaleDateString()}
+                        </td>
+                        <td className="px-5 py-4 font-extrabold text-[#333333]">${order.Order_Total?.toFixed(2) || '0.00'}</td>
                         <td className="px-5 py-4">
-                          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-extrabold uppercase text-blue-700">{order.paymentStatus || 'pending'}</span>
+                          <span className={`rounded-full px-3 py-1 text-xs font-extrabold uppercase ${
+                            order.Order_PaymentStatus === 'PAID' ? 'bg-green-50 text-green-700' : 'bg-blue-50 text-blue-700'
+                          }`}>
+                            {order.Order_PaymentStatus || 'PENDING'}
+                          </span>
                         </td>
                         <td className="px-5 py-4">
-                          <select defaultValue={order.status} className="rounded-full border-0 bg-orange-50 px-3 py-2 text-xs font-extrabold uppercase text-orange-700 outline-none ring-1 ring-orange-100">
-                            <option value="pending">Pending</option>
-                            <option value="confirmed">Confirmed</option>
-                            <option value="in_progress">In progress</option>
-                            <option value="completed">Completed</option>
-                            <option value="cancelled">Cancelled</option>
+                          <select
+                            value={order.Order_Status}
+                            onChange={(e) => handleUpdateStatus(order.Order_ID, e.target.value)}
+                            disabled={updating === order.Order_ID}
+                            className={`rounded-full border-0 px-3 py-2 text-xs font-extrabold uppercase outline-none ring-1 transition-all ${
+                              order.Order_Status === 'COMPLETED'
+                                ? 'bg-green-50 text-green-700 ring-green-200'
+                                : order.Order_Status === 'CANCELLED'
+                                ? 'bg-red-50 text-red-700 ring-red-200'
+                                : 'bg-orange-50 text-orange-700 ring-orange-100 hover:ring-orange-200'
+                            } ${updating === order.Order_ID ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                          >
+                            <option value="PENDING">Pending</option>
+                            <option value="CONFIRMED">Confirmed</option>
+                            <option value="IN_PROGRESS">In Progress</option>
+                            <option value="COMPLETED">Completed</option>
+                            <option value="CANCELLED">Cancelled</option>
                           </select>
+                        </td>
+                        <td className="px-5 py-4">
+                          {order.Order_Status === 'COMPLETED' ? (
+                            <div className="flex items-center gap-2 text-green-600 font-medium">
+                              <CheckCircle2 className="h-4 w-4" />
+                              Delivered
+                            </div>
+                          ) : order.Order_Status === 'IN_PROGRESS' ? (
+                            <div className="flex items-center gap-2 text-blue-600 font-medium">
+                              <Truck className="h-4 w-4" />
+                              In Transit
+                            </div>
+                          ) : (
+                            <span className="text-[#777777] text-sm">-</span>
+                          )}
                         </td>
                       </tr>
                     ))}
                     {orders.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-5 py-10 text-center font-semibold text-[#777777]">No orders yet</td>
+                        <td colSpan={6} className="px-5 py-10 text-center font-semibold text-[#777777]">No orders yet</td>
                       </tr>
                     )}
                   </tbody>

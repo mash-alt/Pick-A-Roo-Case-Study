@@ -3,12 +3,12 @@ const bcrypt = require('bcryptjs');
 
 async function getUsers(req, res) {
   const { page = 1, limit = 20, role } = req.query;
-  const result = await userModel.findAll({ 
-    page: Number(page) || 1, 
+  const result = await userModel.findAll({
+    page: Number(page) || 1,
     limit: Math.min(Number(limit) || 20, 100),
     filters: role ? { User_Role: role } : {}
   });
-  res.json(result);
+  res.json({ data: result.data || result });
 }
 
 async function getUser(req, res) {

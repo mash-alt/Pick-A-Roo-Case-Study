@@ -5,12 +5,12 @@ const pool = require('../config/db');
 
 async function getStores(req, res) {
   const { page = 1, limit = 20, status } = req.query;
-  const result = await storeModel.findAll({ 
-    page: Number(page) || 1, 
+  const result = await storeModel.findAll({
+    page: Number(page) || 1,
     limit: Math.min(Number(limit) || 20, 100),
     filters: status ? { Store_Status: status } : {}
   });
-  res.json(result);
+  res.json({ data: result.data || result });
 }
 
 async function getStore(req, res) {
