@@ -17,7 +17,10 @@ export default function Orders() {
 
   useEffect(() => {
     api.get('/orders')
-      .then((res) => setOrders(res.data.map(mapOrder).filter(Boolean)))
+      .then((res) => {
+        const ordersData = res.data?.data || res.data || [];
+        setOrders(Array.isArray(ordersData) ? ordersData.map(mapOrder).filter(Boolean) : []);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);

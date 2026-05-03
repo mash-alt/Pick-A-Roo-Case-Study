@@ -79,25 +79,24 @@ export default function Dashboard() {
   const getStatusLabel = (status: string) => {
     return status.replace(/_/g, ' ').split(' ').map(w => w.charAt(0) + w.slice(1).toLowerCase()).join(' ');
   };
-    const oldOrder = orders.find(o => o.Order_ID === orderId);
+
+  const handleUpdateStatus = async (orderId: number, newStatus: Order['Order_Status']) => {
+    const oldOrder = orders.find((o) => o.Order_ID === orderId);
     if (!oldOrder) return;
 
-    // Optimistically update the UI
     setUpdating(orderId);
-    setOrders(orders.map(o =>
-      o.Order_ID === orderId ? { ...o, Order_Status: newStatus as any } : o
+    setOrders(orders.map((o) =>
+      o.Order_ID === orderId ? { ...o, Order_Status: newStatus } : o
     ));
 
     try {
       const res = await api.put(`/orders/${orderId}`, { Order_Status: newStatus });
       const updatedOrder = res.data?.data || res.data;
 
-      // Update with server response
-      setOrders(orders.map(o =>
-        o.Order_ID === orderId ? { ...updatedOrder } : o
+      setOrders((currentOrders) => currentOrders.map((o) =>
+        o.Order_ID === orderId ? { ...o, ...updatedOrder } : o
       ));
 
-      // Show success toast with status transition
       const statusLabel = {
         'PENDING': 'Pending',
         'CONFIRMED': 'Confirmed',
@@ -110,8 +109,7 @@ export default function Dashboard() {
         description: new Date().toLocaleTimeString(),
       });
     } catch (err: any) {
-      // Revert on error
-      setOrders(orders.map(o =>
+      setOrders((currentOrders) => currentOrders.map((o) =>
         o.Order_ID === orderId ? oldOrder : o
       ));
 
@@ -358,7 +356,7 @@ export default function Dashboard() {
                         <td className="px-5 py-4">
                           <select
                             value={order.Order_Status}
-                            onChange={(e) => handleUpdateStatus(order.Order_ID, e.target.value)}
+                            onChange={(e) => handleUpdateStatus(order.Order_ID, e.target.value as Order['Order_Status'])}
                             disabled={updating === order.Order_ID}
                             className={`rounded-full border-0 px-3 py-2 text-xs font-extrabold uppercase outline-none ring-1 transition-all duration-300 ${
                               getStatusColor(order.Order_Status)
