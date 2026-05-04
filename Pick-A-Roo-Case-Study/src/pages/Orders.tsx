@@ -15,7 +15,7 @@ export default function Orders() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchOrders = () => {
     api.get('/orders')
       .then((res) => {
         const ordersData = res.data?.data || res.data || [];
@@ -23,6 +23,12 @@ export default function Orders() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 5000); // Poll every 5 seconds
+    return () => clearInterval(interval);
   }, []);
 
   if (loading) {

@@ -67,8 +67,8 @@ export function mapOrder(order: any) {
     shopperId: order.Order_ShoprID ?? order.shopperId,
     createdAt: order.Order_OrderDate ?? order.createdAt,
     total: Number(order.Order_Total ?? order.total ?? 0),
-    status: mapRole(order.Order_Status ?? order.status),
-    paymentStatus: mapRole(order.Order_PaymentStatus ?? order.paymentStatus),
+    status: String(order.Order_Status ?? order.status ?? 'pending').toLowerCase(),
+    paymentStatus: String(order.Order_PaymentStatus ?? order.paymentStatus ?? 'pending').toLowerCase(),
     deliveryAddress: order.Order_DeliveryAddress ?? order.deliveryAddress,
     items: Array.isArray(order.items)
       ? order.items.map((item: any) => ({
