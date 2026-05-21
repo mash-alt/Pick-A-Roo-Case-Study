@@ -12,7 +12,7 @@ export function mapUser(user: any) {
   if (!user) return null;
 
   return {
-    id: user.User_ID ?? user.id,
+    id: Number(user.User_ID ?? user.id ?? 0),
     firstName: user.User_FName ?? user.firstName ?? '',
     lastName: user.User_LName ?? user.lastName ?? '',
     email: user.User_Email ?? user.email,
@@ -26,12 +26,12 @@ export function mapStore(store: any) {
   if (!store) return null;
 
   return {
-    id: store.Store_ID ?? store.id,
+    id: Number(store.Store_ID ?? store.id ?? 0),
     name: store.Store_Name ?? store.name,
     city: store.Store_City ?? store.city,
     location: store.Store_Loc ?? store.location,
     contactNumber: store.Store_ContactNum ?? store.contactNumber,
-    ownerId: store.Store_OwnerID ?? store.ownerId,
+    ownerId: Number(store.Store_OwnerID ?? store.ownerId ?? 0),
     status: store.Store_Status ?? store.status,
     category: store.category ?? 'Grocery',
     rating: store.rating ?? 4.8,
@@ -45,8 +45,8 @@ export function mapProduct(product: any) {
   if (!product) return null;
 
   return {
-    id: product.Prod_ID ?? product.id,
-    storeId: product.Prod_StoreID ?? product.storeId,
+    id: Number(product.Prod_ID ?? product.id ?? 0),
+    storeId: Number(product.Prod_StoreID ?? product.storeId ?? 0),
     name: product.Prod_Name ?? product.name,
     price: Number(product.Prod_Price ?? product.price ?? 0),
     stock: Number(product.Prod_Stock ?? product.stock ?? 0),
@@ -61,10 +61,10 @@ export function mapOrder(order: any) {
   if (!order) return null;
 
   return {
-    id: order.Order_ID ?? order.id,
-    userId: order.Order_UserID ?? order.userId,
-    storeId: order.Order_StoreID ?? order.storeId,
-    shopperId: order.Order_ShoprID ?? order.shopperId,
+    id: Number(order.Order_ID ?? order.id ?? 0),
+    userId: Number(order.Order_UserID ?? order.userId ?? 0),
+    storeId: Number(order.Order_StoreID ?? order.storeId ?? 0),
+    shopperId: Number(order.Order_ShoprID ?? order.shopperId ?? 0),
     createdAt: order.Order_OrderDate ?? order.createdAt,
     total: Number(order.Order_Total ?? order.total ?? 0),
     status: String(order.Order_Status ?? order.status ?? 'pending').toLowerCase(),
@@ -73,8 +73,8 @@ export function mapOrder(order: any) {
     items: Array.isArray(order.items)
       ? order.items.map((item: any) => ({
           id: item.OItem_ID ?? item.id,
-          productId: item.OItem_ProdID ?? item.productId,
-          quantity: item.OItem_Quantity ?? item.quantity,
+          productId: Number(item.OItem_ProdID ?? item.productId ?? 0),
+          quantity: Number(item.OItem_Quantity ?? item.quantity ?? 0),
           subtotal: Number(item.OItem_SubTotal ?? item.subtotal ?? 0),
           name: item.Prod_Name ?? item.name,
           image:

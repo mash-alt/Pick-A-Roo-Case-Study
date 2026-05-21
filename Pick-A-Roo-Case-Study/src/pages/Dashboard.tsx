@@ -61,6 +61,16 @@ interface Store {
   status: string;
 }
 
+interface PaginatedResponse<T> {
+  data: T[];
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1514996937319-344454492b37?auto=format&fit=crop&w=900&q=80';
 
@@ -102,6 +112,24 @@ export default function Dashboard() {
     storeId: ''
   });
 
+  const fetchAllProductsForStore = async (storeId: number) => {
+    const allProducts: any[] = [];
+    let page = 1;
+    let totalPages = 1;
+
+    while (page <= totalPages) {
+      const res = await api.get<PaginatedResponse<any>>('/products', {
+        params: { storeId, page, limit: 100 }
+      });
+      const payload = res.data || { data: [] };
+      allProducts.push(...(Array.isArray(payload.data) ? payload.data : []));
+      totalPages = payload.pagination?.totalPages || 1;
+      page += 1;
+    }
+
+    return allProducts;
+  };
+
   const loadOwnerData = async (showLoader = false) => {
     if (showLoader) {
       setLoading(true);
@@ -110,22 +138,17 @@ export default function Dashboard() {
     }
 
     try {
-      const [storesRes, productsRes, ordersRes] = await Promise.all([
-        api.get('/stores'),
-        api.get('/products'),
+      const [storesRes, ordersRes] = await Promise.all([
+        user?.role === 'store_owner' ? api.get('/stores/mine') : api.get('/stores'),
         api.get('/orders')
       ]);
 
-      const allStores = (storesRes.data || []).map(mapStore).filter(Boolean) as Store[];
-      const ownerStores = allStores.filter((store) => {
-        if (user?.role === 'store_owner') {
-          return store.ownerId === user.id;
-        }
-        return true;
-      });
+      const ownerStores = ((storesRes.data || []) as any[]).map(mapStore).filter(Boolean) as Store[];
 
       const ownerStoreIds = new Set(ownerStores.map((store) => store.id));
-      const mappedProducts = ((productsRes.data?.data || productsRes.data || []) as any[])
+      const productPayloads = await Promise.all(ownerStores.map((store) => fetchAllProductsForStore(store.id)));
+      const mappedProducts = productPayloads
+        .flat()
         .map(mapProduct)
         .filter(Boolean) as Product[];
       const ownerProducts = mappedProducts.filter((product) => ownerStoreIds.has(product.storeId));
